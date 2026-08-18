@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juhokim/queuemaxxing/internal/wal"
+	"github.com/jurinho17-sv/queuemaxxing/internal/wal"
 )
 
 // Compaction runs when the log is at least compactMinRecords long and at least

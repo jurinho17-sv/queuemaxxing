@@ -10,7 +10,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/juhokim/queuemaxxing/internal/queue"
+	"github.com/jurinho17-sv/queuemaxxing/internal/queue"
 )
 
 // maxBodyBytes caps a request body so one client cannot exhaust memory.

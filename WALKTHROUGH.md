@@ -50,9 +50,9 @@ Worked examples:
 |---|---|---|
 | FIFO/LIFO, priority, delay | named | built |
 | Persistence without a database | named | built |
-| Log compaction | **B** — the assessment names "protected from application restarts", and startup replays the whole log, so an ever-growing log makes recovery time grow without bound | built |
-| Queue name validation | **B** — the name becomes a directory, so without it a name like `../..` escapes the data directory | built |
-| Ack / visibility timeout | **C** — durability of *stored* data holds without it | answered, not built |
+| Log compaction | **B.** The assessment names "protected from application restarts", and startup replays the whole log, so an ever-growing log makes recovery time grow without bound | built |
+| Queue name validation | **B.** The name becomes a directory, so without it a name like `../..` escapes the data directory | built |
+| Ack / visibility timeout | **C.** Durability of *stored* data holds without it | answered, not built |
 | Dead-letter queues, auth, clustering, long polling | **C** | answered, not built |
 
 A useful detail: the assessment links to
@@ -63,7 +63,7 @@ tells you which of the two is in scope.
 
 ---
 
-## 2. `internal/wal` — the storage engine
+## 2. `internal/wal`: the storage engine
 
 Read [internal/wal/wal.go](internal/wal/wal.go) first. Everything else depends on it, and it
 is the requirement with the least room to improvise: *storage cannot be delegated to a
@@ -144,7 +144,7 @@ half-swapped file.
 
 ---
 
-## 3. `internal/queue/policy.go` — the ordering model
+## 3. `internal/queue/policy.go`: the ordering model
 
 Sixty-six lines, and the interesting part is one function.
 [policy.go:58](internal/queue/policy.go#L58):
@@ -187,7 +187,7 @@ that sends `priority: 9` cannot silently jump the line. `Enqueue` zeroes the fie
 
 ---
 
-## 4. `internal/queue/queue.go` — the engine
+## 4. `internal/queue/queue.go`: the engine
 
 [internal/queue/queue.go](internal/queue/queue.go) is where storage and ordering meet.
 
@@ -204,9 +204,9 @@ property here is that the comparison is a parameter, so `msgHeap` at
 [queue.go:280](internal/queue/queue.go#L280) takes it as a field and one type serves both
 heaps:
 
-- `ready` compares with `policy.before` — the message that should go next is at the root.
-- `delayed` compares with `visible_at` ascending — the message that becomes visible soonest
-  is at the root.
+- `ready` compares with `policy.before`, so the message that should go next is at the root.
+- `delayed` compares with `visible_at` ascending, so the message that becomes visible
+  soonest is at the root.
 
 `promote` at [queue.go:242](internal/queue/queue.go#L242) is the whole delay mechanism:
 
@@ -228,12 +228,12 @@ The ordering of these two steps is the durability argument, so it is worth stati
 cases.
 
 `Enqueue` at [queue.go:136](internal/queue/queue.go#L136) appends the `put` record, and only
-then pushes onto a heap. Crash in between and the message is in the log but not in memory —
-the next startup replays it and it appears. Nothing is lost.
+then pushes onto a heap. Crash in between and the message is in the log but not in memory.
+The next startup replays it and it appears, so nothing is lost.
 
 `Dequeue` at [queue.go:184](internal/queue/queue.go#L184) appends the `del` record, and only
 then pops from the heap. Crash in between and the message is tombstoned on disk but still in
-memory — memory dies with the process, so the next startup agrees it is gone. Nothing is
+memory. Memory dies with the process, so the next startup agrees it is gone and nothing is
 delivered twice.
 
 If the order were reversed in either case, the crash window would produce the opposite and
@@ -280,10 +280,10 @@ test verifies the contents, not just the size.
 
 ---
 
-## 5. `internal/queue/broker.go` — many queues
+## 5. `internal/queue/broker.go`: many queues
 
 [internal/queue/broker.go](internal/queue/broker.go) maps names to queues and owns the data
-directory. Three details are worth pointing at.
+directory.
 
 **Name validation** ([broker.go:14](internal/queue/broker.go#L14)). A queue name becomes a
 directory name, so `nameRE` restricts it to letters, digits, underscore and hyphen. This is
@@ -304,13 +304,11 @@ creation.
 
 ---
 
-## 6. `internal/httpapi` — the thin part
+## 6. `internal/httpapi`: the thin part
 
 [internal/httpapi/server.go](internal/httpapi/server.go) decodes JSON, calls one queue
 method, encodes the result. It is deliberately boring: everything that could be subtly wrong
 lives in `internal/queue`, and this layer has no state of its own.
-
-Worth noting:
 
 **No router dependency.** Go's `net/http.ServeMux` has matched on method and path variables
 since 1.22, so `POST /queues/{name}/messages` is a standard-library pattern. The project has
@@ -318,7 +316,7 @@ zero third-party dependencies, which is a much easier claim to make when the sto
 also hand-written.
 
 **204 versus 404 on pop** ([server.go:121](internal/httpapi/server.go#L121)). `404` means the
-queue does not exist. `204` means the queue exists and has nothing deliverable *right now* —
+queue does not exist. `204` means the queue exists and has nothing deliverable *right now*,
 which is not the same as empty, because it may be holding messages that are still inside
 their delay. Collapsing the two would make a delay queue indistinguishable from a missing one.
 
@@ -333,7 +331,7 @@ the server allocate without limit.
 
 ---
 
-## 7. `cmd/` — the binaries
+## 7. `cmd/`: the binaries
 
 **`cmd/queued`** is the server. The only part worth reading is that opening the broker
 replays every queue's log *before* the listener starts, so the server is never reachable in a
@@ -377,6 +375,31 @@ happened to work out. A concurrency test that passes without it proves much less
 `scripts/demo.sh` covers what a unit test cannot: it `kill -9`s a live server and restarts
 it. No deferred cleanup, no flush on the way out, nothing but what was already on disk.
 
+### Falsifying the tests
+
+A test only proves something if it fails when the thing it describes is broken. A test that
+passes either way is decoration. So each of these breakages was introduced deliberately, one
+at a time, and the suite was run against it. Every row below was actually executed.
+
+| Break this | What fails |
+|---|---|
+| `policy.go`: flip FIFO's tie-break to `a.Seq > b.Seq` | `TestPolicyOrdering/fifo`, `/priority_fifo` |
+| `policy.go`: stop consulting the priority key | `TestPolicyOrdering/priority_fifo`, `/priority_lifo` |
+| `queue.go`: let `promote` move every delayed message regardless of the clock | `TestDelayHidesMessageUntilVisible`, `TestDelayedMessageSurvivesRestart` |
+| `wal.go`: skip the CRC32 comparison in `Replay` | `TestReplayStopsAtBadChecksum` |
+| `queue.go`: take the mutex off `Dequeue` | `TestConcurrentConsumersNeverDuplicate`, reported by `-race` as a data race |
+| `queue.go`: update the heaps *before* appending to the log | **nothing fails** |
+
+The last row is the interesting one. Reversing the write-ahead ordering in `Enqueue` breaks
+the durability argument in section 4, and the entire suite still passes. No test covers it,
+because a Go test never dies between two statements. That invariant rests on the reasoning
+and on the `kill -9` in `scripts/demo.sh`, and even the demo does not land inside the
+microsecond window the ordering protects.
+
+Covering it would take a child process killed at a chosen syscall, which is a fault-injection
+harness rather than a unit test. Worth knowing either way, about this codebase or any other:
+which claims are tested, and which are argued.
+
 ---
 
 ## 9. Questions I would expect, and the answers
@@ -388,7 +411,7 @@ a more complex crash story.
 
 **Is one fsync per message not slow?** Yes, and that is the intended trade. A queue that
 returns 201 before the data is durable is fast at the wrong thing. The right fix is group
-commit — batch concurrent writers into one fsync — which keeps the guarantee and amortises
+commit, batching concurrent writers into one fsync, which keeps the guarantee and amortises
 the cost. It is listed as future work rather than half-built.
 
 **Why is the whole index in memory?** Because recovery replays the whole log anyway, so the
@@ -402,7 +425,7 @@ on the data directory at startup is a few lines and would be the first thing to 
 were deployed anywhere real.
 
 **Why is priority an `int` and not a bounded range?** Nothing in the comparator needs a
-bound, and picking one (SQS-style 0–9, RabbitMQ's 0–255) would be an arbitrary limit the
+bound, and picking one (SQS-style 0 to 9, RabbitMQ's 0 to 255) would be an arbitrary limit the
 assessment did not ask for.
 
 **How would you know it is behaving in production?** Currently you would not, beyond

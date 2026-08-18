@@ -12,7 +12,7 @@ I built this with Claude Code, in a directed loop: I set the scope rule and the 
 the model wrote most of the Go, and I reviewed and ran everything.
 
 I am saying so plainly because the interesting question is not whether a tool was used. It
-is whether the person submitting the work can defend it — the design decisions, the
+is whether the person submitting the work can defend it: the design decisions, the
 trade-offs, the failure modes, and the parts that are deliberately missing. That is what
 this file and [WALKTHROUGH.md](WALKTHROUGH.md) are for, and it is why the walkthrough
 argues each decision from the assessment text rather than describing the code back to you.
@@ -45,7 +45,7 @@ Worked examples are in [WALKTHROUGH.md §1](WALKTHROUGH.md#1-deciding-what-to-bu
 | 1 | **Go** | Python, TypeScript | Matches the stack Artie actually runs (the `artie-labs` repos are Go, Kafka, Debezium). The standard library covers HTTP, concurrency and `fsync`, so the project has zero third-party dependencies. `go test -race` turns the concurrency requirement into something demonstrable rather than asserted. |
 | 2 | **Hand-written append-only log** | SQLite, BoltDB, an embedded KV store | Forced by "storage cannot be delegated", and also correct on the merits: a queue's access pattern is append-and-scan, which is what a log is for. A B-tree would buy random access the queue never performs. |
 | 3 | **At-most-once; no ack or visibility timeout** | in-flight leases, redelivery, at-least-once | Rule C. The requirements name durability of stored data and concurrency, and say nothing about acknowledgement. The SQS page the assessment links to spends a paragraph distinguishing a *delay* (hidden when added) from a *visibility timeout* (hidden when consumed), which tells you which of the two is in scope. Answered in the README with the exact record type that would change it. |
-| 4 | **Log compaction included** | leave it out, mention it as future work | Rule B. "Protected from application restarts" is an explicit requirement, and startup replays the whole log. A queue deletes every message it delivers, so without compaction the log grows forever and recovery time grows with it — the named requirement stops holding over time. |
+| 4 | **Log compaction included** | leave it out, mention it as future work | Rule B. "Protected from application restarts" is an explicit requirement, and startup replays the whole log. A queue deletes every message it delivers, so without compaction the log grows forever and recovery time grows with it, so the named requirement stops holding over time. |
 | 5 | **Priority as an explicit flag** | always on, with default 0 | Behaviourally identical, so this is about intent. The assessment's own vocabulary distinguishes "a priority FIFO" from a FIFO, so the config speaks the same words. It also makes a surprise impossible: on a queue created without priority, a client sending `priority: 9` cannot silently jump the line. |
 | 6 | **Two heaps, ready and delayed** | one heap plus a scan for eligible messages; one heap with `visible_at` folded into the sort | A single sort key cannot express "not a candidate yet" without corrupting the ordering. Splitting eligibility from ordering keeps `policy.before` readable and makes promotion O(number actually promoted) rather than a scan. |
 | 7 | **`visible_at` stored on the message** | a timer per delayed message | Timers do not survive a restart and would have to be reconstructed. A stored timestamp compared against the clock restores pending delays for free, which is why `TestDelayedMessageSurvivesRestart` needs no special handling. |
@@ -60,7 +60,7 @@ Worked examples are in [WALKTHROUGH.md §1](WALKTHROUGH.md#1-deciding-what-to-bu
 
 **The scope questions.** Partway through, the model surfaced three items as open questions
 for me: whether priority should be a flag, whether to include compaction, and whether the
-demo app should be a CLI or a UI. I rejected the framing — all three are answerable from the
+demo app should be a CLI or a UI. I rejected the framing. All three are answerable from the
 assessment text, and treating them as preferences would have meant deciding the rest of the
 build ad hoc too. We wrote down the A/B/C rule instead and applied it, which is where
 decisions 4, 5 and 10 above come from. Item 4 changed outcome under the rule: it looked like
@@ -96,13 +96,20 @@ script exists at all:
 argument, so `qctl create orders -order fifo -priority` left the flags unread and quietly
 used the defaults. The first demo run failed on it. The fix is `takeArgs` in
 [cmd/qctl/main.go](cmd/qctl/main.go), which peels off each subcommand's fixed positional
-arguments before parsing the rest — and as a side effect stops a message body beginning with
-a dash from being mistaken for a flag.
+arguments before parsing the rest. As a side effect it also stops a message body beginning
+with a dash from being mistaken for a flag.
 
 **Two broken diagrams.** The first PNG export had a container label overlapped by the box
 inside it, and the "no" branch routed on top of the `promote()` arrow so the two read as one
 line. Both were found by looking at the rendered images, not the XML, and fixed in the
 `.drawio` sources.
+
+I also checked the tests themselves, by breaking six things on purpose and confirming which
+test caught each one. Five were caught. Nothing caught the sixth: reversing the write-ahead
+ordering in `Enqueue`, which is the step the durability argument rests on. A unit test never
+dies between two statements. The table and what I concluded from it are in
+[WALKTHROUGH.md §8](WALKTHROUGH.md#8-what-the-tests-are-for). Knowing which claims are tested
+and which are only argued seemed more useful than a coverage percentage.
 
 The tests are written as evidence for specific claims in the README rather than for
 coverage. The mapping from claim to test is in

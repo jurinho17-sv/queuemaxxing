@@ -8,7 +8,8 @@ No database, no embedded store, no external broker. Each queue is one append-onl
 that the process fsyncs on every write and replays on startup. The only dependency is the
 Go standard library.
 
-Built for the [Artie technical assessment](docs/assessment.md), with Claude Code.
+Submitted by **Ju Ho Kim** for the Data Engineer Intern position at Artie, in response to the
+[technical assessment](docs/assessment.md). Built with Claude Code;
 [DECISIONS.md](DECISIONS.md) records the design calls and the alternatives rejected, which
 parts of the reasoning were mine, and what was verified how.
 
@@ -184,15 +185,15 @@ go test ./... -race
 **Redelivery of a message a consumer failed to process.** It does not happen. `Dequeue`
 fsyncs the `del` record before returning the message, which makes delivery *at-most-once*:
 nothing is ever delivered twice, and a consumer that dies mid-processing loses that message.
-That is a deliberate trade, not an oversight — the assessment specifies durability of stored
-data and concurrency, and says nothing about acknowledgements, so I kept the semantics
-narrow and stated.
+That is a deliberate trade rather than an oversight. The assessment specifies durability of
+stored data and concurrency, and says nothing about acknowledgements, so I kept the semantics
+narrow and said so.
 
 Widening it to at-least-once is a small change on the existing structure, which is the
 point: dequeue writes a `lease` record carrying a visibility deadline instead of a `del`,
 the message moves to a third heap keyed on that deadline, and the `del` is written only when
-the consumer acks. Expired leases promote back to ready — the same `promote()` loop the
-delayed heap already uses. Consumers then have to be idempotent, and the stable message `id`
+the consumer acks. Expired leases promote back to ready through the same `promote()` loop
+the delayed heap already uses. Consumers then have to be idempotent, and the stable message `id`
 already in every message is the dedup key they would use.
 
 **Re-reading a history of messages.** The log already *is* that history; what the queue
@@ -214,7 +215,7 @@ message on read; a topic has to let N independent subscribers each see everythin
    Fan-out costs nothing extra because the log is shared and only cursors differ.
 3. **Swap compaction for retention.** Instead of dropping delivered records, drop records
    older than a retention window or below `min(cursors)`.
-4. **Narrow the ordering policy.** This is the part worth being upfront about: a log is
+4. **Narrow the ordering policy.** This is the part to be upfront about: a log is
    inherently FIFO by offset. Priority and LIFO do not survive fan-out cleanly, since each
    subscriber would need its own heap over the shared log rather than a shared cursor. So a
    pub/sub mode would offer FIFO and delay, and priority and LIFO would stay queue-mode
@@ -246,22 +247,20 @@ In the order I would actually build them.
 For most production workloads they should not, and it is worth saying so plainly. This is a
 single node with no replication, so it survives process death but not disk death.
 
-Where it is genuinely a better fit:
+The case for it starts with operational weight. One static binary and one directory is the
+whole deployment. SQS requires AWS and bills per request, RabbitMQ brings an Erlang runtime
+and a cluster to operate, and Pulsar brings BookKeeper and ZooKeeper. This runs anywhere Go
+runs, including embedded directly in another process as a library, with no network hop at all.
 
-**Operational weight.** One static binary and one directory. SQS requires AWS and bills per
-request; RabbitMQ brings an Erlang runtime and a cluster to operate; Pulsar brings BookKeeper
-and ZooKeeper. This runs anywhere Go runs, including embedded directly in another process as
-a library, with no network hop at all.
+The ordering combination is the other reason. SQS offers FIFO queues and no priority;
+priority is emulated by running several queues and polling them in order. RabbitMQ has
+priority queues and a delayed message plugin, but no LIFO. Pulsar is a log, so it is
+offset-ordered by construction. Having priority, LIFO, and delay compose behind one policy in
+one queue is not something the incumbents expose, and it is what the assessment asked for.
 
-**The ordering combination.** SQS offers FIFO queues and no priority; priority is emulated by
-running several queues and polling them in order. RabbitMQ has priority queues and a delayed
-message plugin, but no LIFO. Pulsar is a log, so it is offset-ordered by construction. Having
-priority, LIFO, and delay compose behind one policy in one queue is not something the
-incumbents expose, and it is exactly what the assessment asked for.
-
-**Semantics you can read.** The entire ordering model is one function, and the entire
-durability model is one file format. When a queue misbehaves in production, being able to
-read the rule rather than infer it from documentation is worth a lot.
+There is a smaller point that matters more than it sounds. The whole ordering model is one
+function and the whole durability model is one file format, so when a queue misbehaves in
+production you can read the rule instead of inferring it from documentation.
 
 ---
 

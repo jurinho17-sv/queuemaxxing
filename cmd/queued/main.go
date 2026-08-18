@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/juhokim/queuemaxxing/internal/httpapi"
-	"github.com/juhokim/queuemaxxing/internal/queue"
+	"github.com/jurinho17-sv/queuemaxxing/internal/httpapi"
+	"github.com/jurinho17-sv/queuemaxxing/internal/queue"
 )
 
 func main() {
