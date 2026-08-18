@@ -70,6 +70,10 @@ is the requirement with the least room to improvise: *storage cannot be delegate
 separate queue or database*. No SQLite, no BoltDB, no Redis. The file format is mine to
 design.
 
+![Write path](docs/img/write-path.png)
+<sub>The two paths this section covers: an enqueue reaching disk, and a restart rebuilding
+memory from it. Source: [docs/diagrams/write-path.drawio](docs/diagrams/write-path.drawio)</sub>
+
 ### The record format
 
 ```
@@ -186,6 +190,11 @@ that sends `priority: 9` cannot silently jump the line. `Enqueue` zeroes the fie
 ## 4. `internal/queue/queue.go` — the engine
 
 [internal/queue/queue.go](internal/queue/queue.go) is where storage and ordering meet.
+
+![Ordering model](docs/img/ordering-model.png)
+<sub>The engine in one picture: a gate that sorts messages into two heaps, and a comparator
+that decides the root of one of them. Source:
+[docs/diagrams/ordering-model.drawio](docs/diagrams/ordering-model.drawio)</sub>
 
 ### Two heaps
 

@@ -8,7 +8,9 @@ No database, no embedded store, no external broker. Each queue is one append-onl
 that the process fsyncs on every write and replays on startup. The only dependency is the
 Go standard library.
 
-Built for the [Artie technical assessment](docs/assessment.md).
+Built for the [Artie technical assessment](docs/assessment.md), with Claude Code.
+[DECISIONS.md](DECISIONS.md) records the design calls and the alternatives rejected, which
+parts of the reasoning were mine, and what was verified how.
 
 ---
 
@@ -36,6 +38,7 @@ mode, a delay, a `kill -9` and restart, and four concurrent consumers.
 ## How ordering works
 
 ![Ordering model](docs/img/ordering-model.png)
+<sub>source: [docs/diagrams/ordering-model.drawio](docs/diagrams/ordering-model.drawio)</sub>
 
 The three features in the assessment collapse into two mechanisms.
 
@@ -74,6 +77,7 @@ survives a restart with nothing to reconstruct.
 ## How durability works
 
 ![Write path](docs/img/write-path.png)
+<sub>source: [docs/diagrams/write-path.drawio](docs/diagrams/write-path.drawio)</sub>
 
 Storage cannot be delegated, so `internal/wal` is the storage engine. Each queue owns one
 file:
@@ -280,4 +284,5 @@ scripts/demo.sh      end-to-end demonstration of every property
 docs/assessment.md   the assessment, transcribed
 docs/diagrams/       diagram sources (.drawio)
 WALKTHROUGH.md       a guided read of the code, in the order it makes sense to read it
+DECISIONS.md         decisions, rejected alternatives, and the verification record
 ```
