@@ -1,0 +1,56 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="ordering-model" id="ordering-model">
+    <mxGraphModel dx="1300" dy="520" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1300" pageHeight="500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#232F3E;" value="Ordering model &#8212; one comparator, one visibility filter">
+          <mxGeometry x="30" y="20" width="900" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#546E7A;" value="FIFO/LIFO and priority are the sort. Delay is not part of the sort at all &#8212; it decides which heap a message waits in.">
+          <mxGeometry x="30" y="56" width="1150" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="enq" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;Enqueue&lt;/b&gt;&lt;br&gt;seq := next++">
+          <mxGeometry x="30" y="185" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="gate" parent="1" vertex="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;" value="visible_at&lt;br&gt;&amp;gt; now ?">
+          <mxGeometry x="205" y="170" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="delayed" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;delayed heap&lt;/b&gt;&lt;br&gt;key: visible_at, ascending">
+          <mxGeometry x="430" y="120" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ready" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;ready heap&lt;/b&gt;&lt;br&gt;key: policy.before">
+          <mxGeometry x="430" y="280" width="250" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="deq" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1E88E5;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;Dequeue&lt;/b&gt;&lt;br&gt;take the heap root">
+          <mxGeometry x="745" y="280" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="nc" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=1.5;dashed=1;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;204 No Content&lt;/b&gt;&lt;br&gt;stored, but nothing due yet">
+          <mxGeometry x="745" y="395" width="180" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ea" parent="1" edge="1" source="enq" target="gate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eb" parent="1" edge="1" source="gate" target="delayed" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7B1FA2;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#7B1FA2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ec" parent="1" edge="1" source="gate" target="ready" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#FB8C00;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#FB8C00;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ed" parent="1" edge="1" source="delayed" target="ready" value="promote() &#8212; the root is due" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7B1FA2;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#7B1FA2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ee" parent="1" edge="1" source="ready" target="deq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1E88E5;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="ef" parent="1" edge="1" source="ready" target="nc" value="empty" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#546E7A;exitX=1;exitY=0.85;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="codebox" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#546E7A;strokeWidth=1;fontSize=10;fontFamily=Courier New;fontColor=#232F3E;align=left;verticalAlign=top;spacingLeft=12;spacingTop=8;" value="func (p Policy) before(a, b *Message) bool {&lt;br&gt;&#160;&#160;&#160;&#160;if p.Priority &amp;&amp; a.Priority != b.Priority {&lt;br&gt;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;return a.Priority &gt; b.Priority&lt;br&gt;&#160;&#160;&#160;&#160;}&lt;br&gt;&#160;&#160;&#160;&#160;if p.Order == FIFO {&lt;br&gt;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;return a.Seq &amp;lt; b.Seq&lt;br&gt;&#160;&#160;&#160;&#160;}&lt;br&gt;&#160;&#160;&#160;&#160;return a.Seq &gt; b.Seq&lt;br&gt;}">
+          <mxGeometry x="965" y="120" width="325" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="codecap" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#546E7A;" value="The whole ordering model. Priority is the primary key&lt;br&gt;when the queue enables it; the sequence number breaks&lt;br&gt;ties, ascending for FIFO and descending for LIFO.">
+          <mxGeometry x="965" y="300" width="325" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=top;fontSize=12;fontColor=#546E7A;" value="Delay is modelled on Amazon SQS delay queues: the clock starts when the message is &lt;i&gt;added&lt;/i&gt;, not when it is consumed.&lt;br&gt;visible_at is stored on the message, so a restart restores pending delays without any timer to recreate.">
+          <mxGeometry x="30" y="398" width="470" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

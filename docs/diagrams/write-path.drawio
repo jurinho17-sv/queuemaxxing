@@ -1,0 +1,70 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="write-path" id="write-path">
+    <mxGraphModel dx="1280" dy="520" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1260" pageHeight="500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#232F3E;" value="Write path &#8212; durability before the response">
+          <mxGeometry x="30" y="20" width="900" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#546E7A;" value="No database, no embedded store: one append-only file per queue, fsynced on every write. Restart replays it to rebuild the index.">
+          <mxGeometry x="30" y="56" width="1150" height="22" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lane1" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#1E88E5;" value="ENQUEUE">
+          <mxGeometry x="30" y="102" width="300" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="client" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;HTTP client&lt;/b&gt;&lt;br&gt;qctl, curl, any app">
+          <mxGeometry x="30" y="130" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1E88E5;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;internal/httpapi&lt;/b&gt;&lt;br&gt;POST /queues/{q}/messages">
+          <mxGeometry x="215" y="130" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="broker" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1E88E5;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;queue.Broker&lt;/b&gt;&lt;br&gt;name &#8594; *Queue">
+          <mxGeometry x="430" y="130" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="qbox" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=1;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#232F3E;" value="queue.Queue &#8212; one sync.Mutex">
+          <mxGeometry x="625" y="102" width="320" height="196" as="geometry" />
+        </mxCell>
+        <mxCell id="walstep" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;1. wal.Append(put)&lt;/b&gt;&lt;br&gt;write(2) then fsync(2)">
+          <mxGeometry x="645" y="155" width="280" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="idxstep" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;2. in-memory index&lt;/b&gt;&lt;br&gt;push onto ready or delayed heap">
+          <mxGeometry x="645" y="228" width="280" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="disk" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;data/&#8249;queue&#8250;/wal.log&lt;/b&gt;&lt;br&gt;[4B len][4B crc32][json record]">
+          <mxGeometry x="985" y="155" width="245" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" parent="1" edge="1" source="client" target="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#546E7A;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" parent="1" edge="1" source="api" target="broker" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" parent="1" edge="1" source="broker" target="walstep" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" parent="1" edge="1" source="walstep" target="disk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#43A047;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" parent="1" edge="1" source="walstep" target="idxstep" value="only after fsync returns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#546E7A;verticalAlign=middle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" parent="1" edge="1" source="idxstep" target="client" value="201 Created &#8212; already durable" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#1E88E5;strokeWidth=1.5;endArrow=block;fontSize=11;fontColor=#1E88E5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="105" y="240" /></Array></mxGeometry>
+        </mxCell>
+
+        <mxCell id="lane2" parent="1" vertex="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#43A047;" value="RESTART &#8212; after a clean stop or a kill -9">
+          <mxGeometry x="30" y="352" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="replay" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;wal.Replay&lt;/b&gt;&lt;br&gt;apply put / del in write order&lt;br&gt;drop a torn tail at the first bad crc32">
+          <mxGeometry x="625" y="380" width="320" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="rebuild" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FB8C00;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;rebuild the index&lt;/b&gt;&lt;br&gt;live set &#8594; ready / delayed">
+          <mxGeometry x="390" y="380" width="200" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="resume" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#546E7A;strokeWidth=1.5;fontSize=12;fontColor=#232F3E;verticalAlign=middle;" value="&lt;b&gt;serving again&lt;/b&gt;&lt;br&gt;same messages, same order, same delays">
+          <mxGeometry x="30" y="380" width="320" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" parent="1" edge="1" source="disk" target="replay" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#43A047;strokeWidth=1.5;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" parent="1" edge="1" source="replay" target="rebuild" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" parent="1" edge="1" source="rebuild" target="resume" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#546E7A;strokeWidth=1.5;endArrow=block;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
