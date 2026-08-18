@@ -1,8 +1,8 @@
 # Walkthrough
 
 A guided read of this repository, in the order the code makes sense to read it. It exists
-for two reasons: so a reviewer can follow the reasoning without reverse-engineering it from
-the source, and so I can explain any line of it out loud.
+for two reasons. A reviewer can follow the reasoning without reverse-engineering it from the
+source, and I can explain any line of it out loud.
 
 Every section answers the same three questions. What does this file do? Why is it built this
 way and not another way? What would break if it were not?
@@ -18,7 +18,7 @@ Two ideas carry the whole implementation.
 
 **Ordering is one comparison function.** Priority is the primary sort key, the sequence
 number breaks ties ascending or descending, and that is the entire difference between a
-priority FIFO and a priority LIFO. Delay is not part of the sort at all: it decides whether
+priority FIFO and a priority LIFO. Delay is not part of the sort at all. It decides whether
 a message is eligible yet, which is a second heap and a promotion step.
 
 **Durability is one append-only file per queue.** Every write is framed, checksummed, and
@@ -31,7 +31,7 @@ Everything else is plumbing around those two.
 
 ## 1. Deciding what to build
 
-Before any code, every candidate feature went through the same three questions:
+Before any code, every candidate feature went through the same three questions.
 
 - **A.** Is it named in the assessment? Then build it.
 - **B.** Is it unnamed, but required for something the assessment *does* name to actually
@@ -44,7 +44,7 @@ questions* that asks, among other things, what I would add given more time. That
 where ambition belongs. Every feature added to the code is a feature subtracted from that
 answer.
 
-Worked examples:
+Worked examples.
 
 | Feature | Test | Outcome |
 |---|---|---|
@@ -55,7 +55,7 @@ Worked examples:
 | Ack / visibility timeout | **C.** Durability of *stored* data holds without it | answered, not built |
 | Dead-letter queues, auth, clustering, long polling | **C** | answered, not built |
 
-A useful detail: the assessment links to
+One useful detail. The assessment links to
 [Amazon SQS delay queues](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-delay-queues.html),
 and that page spends a paragraph distinguishing a delay queue (hidden when a message is
 *added*) from a visibility timeout (hidden after it is *consumed*). The linked reference
@@ -63,16 +63,16 @@ tells you which of the two is in scope.
 
 ---
 
-## 2. `internal/wal`: the storage engine
+## 2. `internal/wal`, the storage engine
 
 Read [internal/wal/wal.go](internal/wal/wal.go) first. Everything else depends on it, and it
-is the requirement with the least room to improvise: *storage cannot be delegated to a
+is the requirement with the least room to improvise, since *storage cannot be delegated to a
 separate queue or database*. No SQLite, no BoltDB, no Redis. The file format is mine to
 design.
 
 ![Write path](docs/img/write-path.png)
-<sub>The two paths this section covers: an enqueue reaching disk, and a restart rebuilding
-memory from it. Source: [docs/diagrams/write-path.drawio](docs/diagrams/write-path.drawio)</sub>
+<sub>The two paths this section covers, an enqueue reaching disk and a restart rebuilding
+memory from it. Source is [docs/diagrams/write-path.drawio](docs/diagrams/write-path.drawio)</sub>
 
 ### The record format
 
@@ -82,7 +82,7 @@ memory from it. Source: [docs/diagrams/write-path.drawio](docs/diagrams/write-pa
 
 Two fields, and each is load-bearing.
 
-**Length** is how you find record boundaries. A log is a stream of bytes; without a length
+**Length** is how you find record boundaries. A log is a stream of bytes, and without a length
 prefix there is no way to know where one record stops and the next begins. (A delimiter
 would work too, but then the payload has to be escaped, and JSON payloads contain newlines.)
 
@@ -116,7 +116,7 @@ could leave a durable file that nothing points to. Fsyncing the directory commit
 intact record to a callback, and stops at the first one that does not check out. It then
 truncates the file at that point.
 
-Truncating sounds destructive. It is correct, and the argument is worth being able to give:
+Truncating sounds destructive. It is correct, and the argument is worth being able to give.
 
 > A bad record can only ever be the last one. Any earlier record already returned from
 > `fsync`, which means the bytes were confirmed durable before the process moved on. So
@@ -124,8 +124,8 @@ Truncating sounds destructive. It is correct, and the argument is worth being ab
 > and by definition no client was ever told it succeeded.
 
 `TestReplayDiscardsTornTail` in [internal/wal/wal_test.go](internal/wal/wal_test.go) forges
-exactly that situation: three good records, then a header claiming 64 bytes with only 4
-following. Replay returns three records, the file shrinks back to the last good boundary,
+exactly that situation, with three good records and then a header claiming 64 bytes when
+only 4 follow. Replay returns three records, the file shrinks back to the last good boundary,
 and appending afterwards still works.
 
 ### Compaction
@@ -133,21 +133,21 @@ and appending afterwards still works.
 `Rewrite` at [wal.go:158](internal/wal/wal.go#L158) replaces the log with a fresh copy of
 only the live records.
 
-Why it is needed: a queue deletes every message it delivers. Send a million and consume a
+Why it is needed. A queue deletes every message it delivers. Send a million and consume a
 million, and the log holds two million records describing zero messages. Since startup
 replays the whole log, restart time grows forever even though the queue is empty.
 
-Why it is safe: the new log is written to `wal.log.compact`, fsynced, and then moved with
+Why it is safe. The new log is written to `wal.log.compact`, fsynced, and then moved with
 `rename(2)`, which POSIX guarantees is atomic. A crash at any instant leaves either the
 complete old log or the complete new one. There is no moment where a reader could see a
 half-swapped file.
 
 ---
 
-## 3. `internal/queue/policy.go`: the ordering model
+## 3. `internal/queue/policy.go`, the ordering model
 
 Sixty-six lines, and the interesting part is one function.
-[policy.go:58](internal/queue/policy.go#L58):
+[policy.go:58](internal/queue/policy.go#L58).
 
 ```go
 func (p Policy) before(a, b *Message) bool {
@@ -164,7 +164,7 @@ func (p Policy) before(a, b *Message) bool {
 The assessment says "we can have a delay, priority LIFO queue, or a priority FIFO". Read
 that carefully and it is describing *configurations of one thing*, not several things. So
 the code has one comparator and a struct of settings, and each phrase in the assessment maps
-to a literal value:
+to a literal value.
 
 ```go
 {Order: LIFO, Priority: true, DelaySeconds: 30}  // "a delay, priority LIFO queue"
@@ -176,39 +176,39 @@ Two decisions inside this small function are worth defending.
 **Why the sequence number rather than a timestamp.** Two messages enqueued in the same
 microsecond can carry the same timestamp, which makes FIFO ambiguous exactly when it is
 under load and matters most. `Seq` is a counter incremented under the queue's lock, so it
-is unique and total by construction. It is also what makes ordering survive a restart:
-timestamps would need clock assumptions, whereas the sequence is written into the log.
+is unique and total by construction. It is also what makes ordering survive a restart,
+because timestamps would need clock assumptions while the sequence is written into the log.
 
 **Why `Priority` is a flag rather than always-on.** Mechanically, "priority disabled" and
 "every message has priority 0" behave identically, so this could have been dropped. It is
 kept because the assessment's own vocabulary distinguishes "a priority FIFO" from a FIFO,
-and because it makes a surprise impossible: on a queue created without priority, a client
+and because it makes a surprise impossible. On a queue created without priority, a client
 that sends `priority: 9` cannot silently jump the line. `Enqueue` zeroes the field.
 
 ---
 
-## 4. `internal/queue/queue.go`: the engine
+## 4. `internal/queue/queue.go`, the engine
 
 [internal/queue/queue.go](internal/queue/queue.go) is where storage and ordering meet.
 
 ![Ordering model](docs/img/ordering-model.png)
-<sub>The engine in one picture: a gate that sorts messages into two heaps, and a comparator
-that decides the root of one of them. Source:
+<sub>The engine in one picture, a gate that sorts messages into two heaps and a comparator
+that decides the root of one of them. Source is
 [docs/diagrams/ordering-model.drawio](docs/diagrams/ordering-model.drawio)</sub>
 
 ### Two heaps
 
 A heap is a tree kept in an array where the smallest element by some comparison is always at
-the root. Push and pop cost O(log n); finding the next message costs O(1). The relevant
+the root. Push and pop cost O(log n), and finding the next message costs O(1). The relevant
 property here is that the comparison is a parameter, so `msgHeap` at
 [queue.go:280](internal/queue/queue.go#L280) takes it as a field and one type serves both
-heaps:
+heaps.
 
 - `ready` compares with `policy.before`, so the message that should go next is at the root.
 - `delayed` compares with `visible_at` ascending, so the message that becomes visible
   soonest is at the root.
 
-`promote` at [queue.go:242](internal/queue/queue.go#L242) is the whole delay mechanism:
+`promote` at [queue.go:242](internal/queue/queue.go#L242) is the whole delay mechanism.
 
 ```go
 for q.delayed.Len() > 0 && !q.delayed.items[0].VisibleAt.After(now) {
@@ -219,7 +219,7 @@ for q.delayed.Len() > 0 && !q.delayed.items[0].VisibleAt.After(now) {
 Because the delayed heap is sorted by visibility, the messages that are due are always a
 prefix of it. The loop touches only the ones it actually moves and stops at the first one
 that is not due. There is no scan of pending messages and no timer goroutine, which is why
-a restart restores pending delays for free: `visible_at` is a stored timestamp, and after
+a restart restores pending delays for free. `visible_at` is a stored timestamp, and after
 recovery `push` files each message into whichever heap matches the current clock.
 
 ### Write-ahead, in both directions
@@ -237,7 +237,7 @@ memory. Memory dies with the process, so the next startup agrees it is gone and 
 delivered twice.
 
 If the order were reversed in either case, the crash window would produce the opposite and
-worse outcome: an acknowledged message that vanishes, or a delivered message that comes back.
+worse outcome, either an acknowledged message that vanishes or a delivered message that returns.
 
 This ordering is also where the at-most-once semantics come from, and it is the honest
 answer to the "replay messages" question. The `del` is durable before the message is handed
@@ -249,27 +249,27 @@ choice, and the README describes the lease record that would change it.
 One `sync.Mutex` per queue, covering both the log and the heaps
 ([queue.go:64](internal/queue/queue.go#L64)).
 
-Why not `RWMutex`: it only helps when there are readers that do not write, and here both
+Why not `RWMutex`. It only helps when there are readers that do not write, and here both
 `Enqueue` and `Dequeue` write to both structures. There are no pure readers to admit in
 parallel.
 
-Why one lock over both rather than one each: because the two must move together. If the log
+Why one lock over both rather than one each. The two must move together. If the log
 and the index had separate locks, another goroutine could observe an index that does not
 match the log. Holding a single lock across the append and the memory update makes the pair
 atomic to everyone outside.
 
-Why this is enough for "must support concurrency": correctness under concurrency means every
+Why this is enough for "must support concurrency". Correctness under concurrency means every
 message goes to exactly one consumer, and the lock gives that directly. `TestConcurrentConsumersNeverDuplicate` runs eight consumers against five hundred messages under `-race` and
 asserts every sequence number was seen exactly once.
 
-What it costs: an fsync happens inside the lock, so one queue serialises at the disk's sync
+What it costs. An fsync happens inside the lock, so one queue serialises at the disk's sync
 rate. Different queues have different locks and do not contend. The fix is group commit,
 which is item two in the "more time" list.
 
 ### `maybeCompact`
 
 At [queue.go:250](internal/queue/queue.go#L250). Fires when the log holds at least 1024
-records and fewer than half of them are live. Both conditions matter: the size floor stops a
+records and fewer than half of them are live. Both conditions matter, since the size floor stops a
 tiny log from being rewritten constantly, and the ratio keeps the amortised cost of a rewrite
 proportional to the garbage it reclaims.
 
@@ -280,14 +280,14 @@ test verifies the contents, not just the size.
 
 ---
 
-## 5. `internal/queue/broker.go`: many queues
+## 5. `internal/queue/broker.go`, many queues
 
 [internal/queue/broker.go](internal/queue/broker.go) maps names to queues and owns the data
 directory.
 
 **Name validation** ([broker.go:14](internal/queue/broker.go#L14)). A queue name becomes a
 directory name, so `nameRE` restricts it to letters, digits, underscore and hyphen. This is
-allow-listing rather than escaping: a name like `../../etc` never gets far enough to need
+allow-listing rather than escaping, so a name like `../../etc` never gets far enough to need
 sanitising.
 
 **Atomic policy writes** (`writeMeta`, [broker.go:168](internal/queue/broker.go#L168)). The
@@ -304,10 +304,10 @@ creation.
 
 ---
 
-## 6. `internal/httpapi`: the thin part
+## 6. `internal/httpapi`, the thin part
 
 [internal/httpapi/server.go](internal/httpapi/server.go) decodes JSON, calls one queue
-method, encodes the result. It is deliberately boring: everything that could be subtly wrong
+method, encodes the result. It is deliberately boring, because everything that could be subtly wrong
 lives in `internal/queue`, and this layer has no state of its own.
 
 **No router dependency.** Go's `net/http.ServeMux` has matched on method and path variables
@@ -331,7 +331,7 @@ the server allocate without limit.
 
 ---
 
-## 7. `cmd/`: the binaries
+## 7. `cmd/`, the binaries
 
 **`cmd/queued`** is the server. The only part worth reading is that opening the broker
 replays every queue's log *before* the listener starts, so the server is never reachable in a
@@ -372,7 +372,7 @@ Tests here are evidence for specific claims in the README, not coverage for its 
 unsynchronised reads and writes, so it catches a missing lock even on a run where the timing
 happened to work out. A concurrency test that passes without it proves much less.
 
-`scripts/demo.sh` covers what a unit test cannot: it `kill -9`s a live server and restarts
+`scripts/demo.sh` covers what a unit test cannot. It `kill -9`s a live server and restarts
 it. No deferred cleanup, no flush on the way out, nothing but what was already on disk.
 
 ### Falsifying the tests
@@ -383,12 +383,12 @@ at a time, and the suite was run against it. Every row below was actually execut
 
 | Break this | What fails |
 |---|---|
-| `policy.go`: flip FIFO's tie-break to `a.Seq > b.Seq` | `TestPolicyOrdering/fifo`, `/priority_fifo` |
-| `policy.go`: stop consulting the priority key | `TestPolicyOrdering/priority_fifo`, `/priority_lifo` |
-| `queue.go`: let `promote` move every delayed message regardless of the clock | `TestDelayHidesMessageUntilVisible`, `TestDelayedMessageSurvivesRestart` |
-| `wal.go`: skip the CRC32 comparison in `Replay` | `TestReplayStopsAtBadChecksum` |
-| `queue.go`: take the mutex off `Dequeue` | `TestConcurrentConsumersNeverDuplicate`, reported by `-race` as a data race |
-| `queue.go`: update the heaps *before* appending to the log | **nothing fails** |
+| Flip FIFO's tie-break in `policy.go` to `a.Seq > b.Seq` | `TestPolicyOrdering/fifo`, `/priority_fifo` |
+| Stop consulting the priority key in `policy.go` | `TestPolicyOrdering/priority_fifo`, `/priority_lifo` |
+| Let `promote` in `queue.go` move every delayed message regardless of the clock | `TestDelayHidesMessageUntilVisible`, `TestDelayedMessageSurvivesRestart` |
+| Skip the CRC32 comparison in `wal.go` `Replay` | `TestReplayStopsAtBadChecksum` |
+| Take the mutex off `Dequeue` in `queue.go` | `TestConcurrentConsumersNeverDuplicate`, reported by `-race` as a data race |
+| Update the heaps in `queue.go` *before* appending to the log | **nothing fails** |
 
 The last row is the interesting one. Reversing the write-ahead ordering in `Enqueue` breaks
 the durability argument in section 4, and the entire suite still passes. No test covers it,
@@ -397,15 +397,15 @@ and on the `kill -9` in `scripts/demo.sh`, and even the demo does not land insid
 microsecond window the ordering protects.
 
 Covering it would take a child process killed at a chosen syscall, which is a fault-injection
-harness rather than a unit test. Worth knowing either way, about this codebase or any other:
-which claims are tested, and which are argued.
+harness rather than a unit test. Worth knowing either way, about this codebase or any other,
+which claims are tested and which are argued.
 
 ---
 
 ## 9. Questions I would expect, and the answers
 
 **Why not just use SQLite or BoltDB?** The assessment forbids delegating storage to a
-separate database. Beyond that: a queue's access pattern is append and scan, which is what a
+separate database. Beyond that, a queue's access pattern is append and scan, which is what a
 log is for. A B-tree would buy random access the queue never uses, and cost a page cache and
 a more complex crash story.
 
@@ -416,11 +416,11 @@ the cost. It is listed as future work rather than half-built.
 
 **Why is the whole index in memory?** Because recovery replays the whole log anyway, so the
 live set has to be materialisable. It bounds capacity to memory, which is a real limit worth
-stating: roughly a few hundred bytes per pending message. Segmented logs plus keeping only
+stating, roughly a few hundred bytes per pending message. Segmented logs plus keeping only
 the ready set resident is the direction if that limit ever binds.
 
 **What happens if two servers point at the same data directory?** They corrupt each other.
-There is no file lock. A single-writer assumption is stated rather than enforced; a `flock`
+There is no file lock. A single-writer assumption is stated rather than enforced. A `flock`
 on the data directory at startup is a few lines and would be the first thing to add if this
 were deployed anywhere real.
 
