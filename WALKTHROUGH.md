@@ -9,7 +9,7 @@ way and not another way? What would break if it were not?
 
 ---
 
-## 0. The sixty-second version
+## 0. Intro
 
 The assessment asks for a queue that can be FIFO or LIFO, with priority, with delay, in any
 combination, persisted without a database, safe under concurrency.
