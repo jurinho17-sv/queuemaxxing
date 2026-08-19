@@ -402,7 +402,7 @@ which claims are tested and which are argued.
 
 ---
 
-## 9. Questions I would expect, and the answers
+## 9. Design questions and known limits
 
 **Why not just use SQLite or BoltDB?** The assessment forbids delegating storage to a
 separate database. Beyond that, a queue's access pattern is append and scan, which is what a
